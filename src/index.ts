@@ -1,25 +1,23 @@
-import dotenv from 'dotenv';
 import app from './app';
 import logger from './infrastructure/logging/logger';
+import config from './config';
+import { closeRedisConnection } from './infrastructure/redis/connection';
 
-dotenv.config();
-
-const PORT = process.env['PORT'] || 3000;
-
-const server = app.listen(PORT, () => {
-  logger.info(`Server running on port ${PORT}`);
-  logger.info(`Environment: ${process.env['NODE_ENV'] || 'development'}`);
+const server = app.listen(config.PORT, () => {
+  logger.info(`Server running on port ${config.PORT}`);
+  logger.info(`Environment: ${config.NODE_ENV}`);
 });
 
-const gracefulShutdown = (signal: string) => {
+const gracefulShutdown = async (signal: string) => {
   logger.info(`${signal} received. Starting graceful shutdown...`);
 
-  server.close((err) => {
+  server.close(async (err) => {
     if (err) {
       logger.error('Error during server close', { error: err.message });
       process.exit(1);
     }
 
+    await closeRedisConnection();
     logger.info('Server closed successfully');
     process.exit(0);
   });

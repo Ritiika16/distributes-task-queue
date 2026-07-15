@@ -5,6 +5,7 @@ import compression from 'compression';
 import morgan from 'morgan';
 import logger from './infrastructure/logging/logger';
 import { requestIdMiddleware } from './api/middleware/requestId';
+import { getRedisConnection } from './infrastructure/redis/connection';
 
 const app = express();
 
@@ -35,12 +36,25 @@ app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
 // Health check endpoint
-app.get('/health', (req: Request, res: Response) => {
+app.get('/health', async (req: Request, res: Response) => {
   const uptime = process.uptime();
+  let redisStatus = 'disconnected';
+
+  try {
+    const redis = getRedisConnection();
+    if (redis.status === 'ready') {
+      await redis.ping();
+      redisStatus = 'connected';
+    }
+  } catch (error) {
+    redisStatus = 'error';
+  }
+
   res.json({
     status: 'ok',
     service: 'distributed-task-queue',
     uptime: Math.floor(uptime),
+    redis: redisStatus,
     timestamp: new Date().toISOString(),
   });
 });
