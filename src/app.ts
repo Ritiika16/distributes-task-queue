@@ -1,4 +1,4 @@
-import express, { Request, Response, NextFunction } from 'express';
+import express, { Response, RequestHandler, ErrorRequestHandler } from 'express';
 import helmet from 'helmet';
 import cors from 'cors';
 import compression from 'compression';
@@ -6,6 +6,7 @@ import morgan from 'morgan';
 import logger from './infrastructure/logging/logger';
 import { requestIdMiddleware } from './api/middleware/requestId';
 import { getRedisConnection } from './infrastructure/redis/connection';
+import notificationRoutes from './api/routes/notification.routes';
 
 const app = express();
 
@@ -19,10 +20,11 @@ app.use(cors());
 app.use(compression());
 
 // Request ID
-app.use(requestIdMiddleware);
+app.use(requestIdMiddleware as RequestHandler);
 
 // Logging with request ID
-morgan.token('request-id', (req: Request) => req.id);
+// eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-return, @typescript-eslint/no-unsafe-member-access
+morgan.token('request-id', (req: any) => req.id);
 app.use(
   morgan(':method :url :status :res[content-length] - :response-time ms [:request-id]', {
     stream: {
@@ -36,7 +38,8 @@ app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
 // Health check endpoint
-app.get('/health', async (req: Request, res: Response) => {
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+app.get('/health', (async (_req: any, res: Response) => {
   const uptime = process.uptime();
   let redisStatus = 'disconnected';
 
@@ -57,18 +60,23 @@ app.get('/health', async (req: Request, res: Response) => {
     redis: redisStatus,
     timestamp: new Date().toISOString(),
   });
-});
+}) as RequestHandler);
+
+// API routes
+app.use('/api/v1', notificationRoutes);
 
 // 404 handler
-app.use((req: Request, res: Response) => {
+// eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-member-access
+app.use(((req: any, res: Response) => {
   res.status(404).json({
     error: 'Not Found',
     message: `Route ${req.method} ${req.path} not found`,
   });
-});
+}) as RequestHandler);
 
 // Global error handler
-app.use((err: Error, req: Request, res: Response, next: NextFunction) => {
+// eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access
+app.use(((err: Error, req: any, res: Response) => {
   logger.error('Unhandled error', {
     error: err.message,
     stack: err.stack,
@@ -79,8 +87,9 @@ app.use((err: Error, req: Request, res: Response, next: NextFunction) => {
 
   res.status(500).json({
     error: 'Internal Server Error',
-    message: process.env['NODE_ENV'] === 'production' ? 'An unexpected error occurred' : err.message,
+    message:
+      process.env['NODE_ENV'] === 'production' ? 'An unexpected error occurred' : err.message,
   });
-});
+}) as ErrorRequestHandler);
 
 export default app;

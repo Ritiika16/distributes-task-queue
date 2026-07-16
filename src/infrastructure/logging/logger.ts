@@ -13,6 +13,7 @@ const logger = winston.createLogger({
         winston.format.colorize(),
         winston.format.printf(({ level, message, timestamp, ...meta }) => {
           const metaStr = Object.keys(meta).length ? JSON.stringify(meta) : '';
+          // eslint-disable-next-line @typescript-eslint/restrict-template-expressions
           return `${timestamp} [${level}]: ${message} ${metaStr}`;
         })
       ),

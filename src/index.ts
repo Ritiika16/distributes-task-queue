@@ -8,9 +8,10 @@ const server = app.listen(config.PORT, () => {
   logger.info(`Environment: ${config.NODE_ENV}`);
 });
 
-const gracefulShutdown = async (signal: string) => {
+const gracefulShutdown = (signal: string) => {
   logger.info(`${signal} received. Starting graceful shutdown...`);
 
+  // eslint-disable-next-line @typescript-eslint/no-misused-promises
   server.close(async (err) => {
     if (err) {
       logger.error('Error during server close', { error: err.message });
