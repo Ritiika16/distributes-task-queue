@@ -17,11 +17,26 @@ export class NotificationController {
         return;
       }
 
-      const jobId = await notificationService.createNotificationJob(validationResult.data);
+      const idempotencyKey = req.headers['idempotency-key'] as string | undefined;
+      const result = await notificationService.createNotificationJob(
+        validationResult.data,
+        idempotencyKey
+      );
+
+      if (result.duplicate) {
+        res.status(200).json({
+          success: true,
+          duplicate: true,
+          jobId: result.jobId,
+          status: 'already_exists',
+        });
+        return;
+      }
 
       res.status(201).json({
         success: true,
-        jobId,
+        duplicate: false,
+        jobId: result.jobId,
         status: 'queued',
       });
     } catch (error) {
