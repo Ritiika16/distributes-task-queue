@@ -1,0 +1,22 @@
+config:
+  target: "http://localhost:3000"
+  phases:
+    - name: "Light Load"
+      duration: 30
+      arrivalRate: 50
+    - name: "Heavy Load"
+      duration: 60
+      arrivalRate: 100
+
+scenarios:
+  - name: "Create Notification Jobs"
+    flow:
+      - post:
+          url: "/api/v1/jobs"
+          json:
+            type: "email"
+            recipient: "user{{$randomNumber()}}@example.com"
+            subject: "Load Test Notification"
+            message: "This is a load test notification"
+          headers:
+            Content-Type: "application/json"
