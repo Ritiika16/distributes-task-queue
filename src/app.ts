@@ -1,4 +1,4 @@
-import express, { Response, RequestHandler, ErrorRequestHandler } from 'express';
+import express, { Response, RequestHandler, ErrorRequestHandler, Request } from 'express';
 import helmet from 'helmet';
 import cors from 'cors';
 import compression from 'compression';
@@ -7,6 +7,8 @@ import logger from './infrastructure/logging/logger';
 import { requestIdMiddleware } from './api/middleware/requestId';
 import { getRedisConnection } from './infrastructure/redis/connection';
 import notificationRoutes from './api/routes/notification.routes';
+import metricsRoutes from './api/routes/metrics.routes';
+import { getDashboardRouter } from './infrastructure/dashboard/dashboard';
 
 const app = express();
 
@@ -64,6 +66,42 @@ app.get('/health', (async (_req: any, res: Response) => {
 
 // API routes
 app.use('/api/v1', notificationRoutes);
+app.use('/api/v1', metricsRoutes);
+
+// Bull Board dashboard with Basic Auth
+const dashboardAuth = (req: Request, res: Response, next: () => void) => {
+  const authHeader = req.headers.authorization;
+
+  if (!authHeader) {
+    res.setHeader('WWW-Authenticate', 'Basic');
+    res.status(401).json({ error: 'Authentication required' });
+    return;
+  }
+
+  const parts = authHeader.split(' ');
+  if (parts.length !== 2 || parts[0] !== 'Basic') {
+    res.status(401).json({ error: 'Invalid authorization header' });
+    return;
+  }
+
+  const token = parts[1] as string;
+  const auth = Buffer.from(token, 'base64').toString().split(':');
+  const username = auth[0];
+  const password = auth[1];
+
+  const validUsername = process.env['BULLBOARD_USERNAME'];
+  const validPassword = process.env['BULLBOARD_PASSWORD'];
+
+  if (username === validUsername && password === validPassword) {
+    next();
+  } else {
+    res.status(401).json({ error: 'Invalid credentials' });
+  }
+};
+
+app.use('/admin/queues', dashboardAuth as RequestHandler, getDashboardRouter());
+
+logger.info('Dashboard mounted at /admin/queues');
 
 // 404 handler
 // eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-member-access
