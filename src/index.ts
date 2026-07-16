@@ -1,12 +1,18 @@
 import app from './app';
 import logger from './infrastructure/logging/logger';
 import config from './config';
-import { closeRedisConnection } from './infrastructure/redis/connection';
+import {
+  closeRedisConnection,
+  closeWorkerRedisConnection,
+} from './infrastructure/redis/connection';
+import { startNotificationWorker, closeNotificationWorker } from './infrastructure/workers/notification.worker';
 
 const server = app.listen(config.PORT, () => {
   logger.info(`Server running on port ${config.PORT}`);
   logger.info(`Environment: ${config.NODE_ENV}`);
 });
+
+startNotificationWorker();
 
 const gracefulShutdown = (signal: string) => {
   logger.info(`${signal} received. Starting graceful shutdown...`);
@@ -18,6 +24,8 @@ const gracefulShutdown = (signal: string) => {
       process.exit(1);
     }
 
+    await closeNotificationWorker();
+    await closeWorkerRedisConnection();
     await closeRedisConnection();
     logger.info('Server closed successfully');
     process.exit(0);

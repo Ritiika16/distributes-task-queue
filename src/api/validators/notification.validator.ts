@@ -1,14 +1,7 @@
 import { z } from 'zod';
 
-/**
- * Zod schema for validating notification job requests.
- * Ensures that all required fields are present and properly formatted.
- */
-export const notificationSchema = z.object({
-  type: z.enum(['email', 'sms', 'push'], {
-    required_error: 'Notification type is required',
-    invalid_type_error: 'Notification type must be one of: email, sms, push',
-  }),
+const emailSchema = z.object({
+  type: z.literal('email'),
   recipient: z
     .string()
     .min(1, 'Recipient is required')
@@ -23,8 +16,38 @@ export const notificationSchema = z.object({
     .max(5000, 'Message must not exceed 5000 characters'),
 });
 
-/**
- * Type inference from the notification schema.
- * Used for type-safe request handling.
- */
+const smsSchema = z.object({
+  type: z.literal('sms'),
+  recipient: z
+    .string()
+    .regex(/^\+\d+$/, 'Recipient must be a valid international phone number starting with +'),
+  subject: z
+    .string()
+    .min(1, 'Subject is required')
+    .max(500, 'Subject must not exceed 500 characters'),
+  message: z
+    .string()
+    .min(1, 'Message is required')
+    .max(5000, 'Message must not exceed 5000 characters'),
+});
+
+const pushSchema = z.object({
+  type: z.literal('push'),
+  recipient: z.string().min(1, 'Recipient is required'),
+  subject: z
+    .string()
+    .min(1, 'Subject is required')
+    .max(500, 'Subject must not exceed 500 characters'),
+  message: z
+    .string()
+    .min(1, 'Message is required')
+    .max(5000, 'Message must not exceed 5000 characters'),
+});
+
+export const notificationSchema = z.discriminatedUnion('type', [
+  emailSchema,
+  smsSchema,
+  pushSchema,
+]);
+
 export type NotificationInput = z.infer<typeof notificationSchema>;
