@@ -6,6 +6,7 @@ import {
   closeWorkerRedisConnection,
 } from './infrastructure/redis/connection';
 import { startNotificationWorker, closeNotificationWorker } from './infrastructure/workers/notification.worker';
+import { closeDLQQueue } from './infrastructure/queue/dlq.queue';
 
 const server = app.listen(config.PORT, () => {
   logger.info(`Server running on port ${config.PORT}`);
@@ -25,6 +26,7 @@ const gracefulShutdown = (signal: string) => {
     }
 
     await closeNotificationWorker();
+    await closeDLQQueue();
     await closeWorkerRedisConnection();
     await closeRedisConnection();
     logger.info('Server closed successfully');

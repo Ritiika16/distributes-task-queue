@@ -1,6 +1,7 @@
 import { Worker, Job } from 'bullmq';
 import { getWorkerRedisConnection } from '../redis/connection';
 import logger from '../logging/logger';
+import { moveToDLQ } from '../../application/services/dlq.service';
 
 let notificationWorker: Worker | null = null;
 
@@ -72,7 +73,7 @@ export const startNotificationWorker = (): Worker => {
     logger.info('Job completed', { jobId: job.id, type: job.data.type });
   });
 
-  notificationWorker.on('failed', (job, err) => {
+  notificationWorker.on('failed', async (job, err) => {
     const attemptsMade = job?.attemptsMade || 0;
     const attemptsRemaining = job?.opts?.attempts || 3;
 
@@ -92,6 +93,10 @@ export const startNotificationWorker = (): Worker => {
         maxAttempts: attemptsRemaining,
         reason: err.message,
       });
+
+      if (job) {
+        await moveToDLQ(job, err.message);
+      }
     }
   });
 
