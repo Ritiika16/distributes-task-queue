@@ -18,6 +18,10 @@ async function processNotificationJob(job: Job): Promise<void> {
 
   logger.info('Job active', { jobId: job.id, type, recipient });
 
+  if (subject === 'FAIL') {
+    throw new Error('Simulated notification failure');
+  }
+
   switch (type) {
     case 'email':
       logger.info('Sending email...', { jobId: job.id, recipient, subject });
@@ -69,11 +73,26 @@ export const startNotificationWorker = (): Worker => {
   });
 
   notificationWorker.on('failed', (job, err) => {
-    logger.error('Job failed', {
-      jobId: job?.id,
-      type: job?.data.type,
-      error: err.message,
-    });
+    const attemptsMade = job?.attemptsMade || 0;
+    const attemptsRemaining = job?.opts?.attempts || 3;
+
+    if (attemptsMade < attemptsRemaining) {
+      logger.info('Job retrying', {
+        jobId: job?.id,
+        type: job?.data.type,
+        attempt: attemptsMade + 1,
+        maxAttempts: attemptsRemaining,
+        reason: err.message,
+      });
+    } else {
+      logger.error('Job permanently failed', {
+        jobId: job?.id,
+        type: job?.data.type,
+        attemptsMade,
+        maxAttempts: attemptsRemaining,
+        reason: err.message,
+      });
+    }
   });
 
   notificationWorker.on('error', (err) => {
