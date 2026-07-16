@@ -3,12 +3,14 @@ import helmet from 'helmet';
 import cors from 'cors';
 import compression from 'compression';
 import morgan from 'morgan';
+import swaggerUi from 'swagger-ui-express';
 import logger from './infrastructure/logging/logger';
 import { requestIdMiddleware } from './api/middleware/requestId';
 import { getRedisConnection } from './infrastructure/redis/connection';
 import notificationRoutes from './api/routes/notification.routes';
 import metricsRoutes from './api/routes/metrics.routes';
 import { getDashboardRouter } from './infrastructure/dashboard/dashboard';
+import { swaggerSpec } from './infrastructure/swagger/swagger';
 
 const app = express();
 
@@ -40,6 +42,23 @@ app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
 // Health check endpoint
+/**
+ * @swagger
+ * /health:
+ *   get:
+ *     summary: Health check
+ *     description: Returns the health status of the service and Redis connection.
+ *     tags: [Health]
+ *     responses:
+ *       200:
+ *         description: Service is healthy
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/HealthResponse'
+ *       500:
+ *         description: Service error
+ */
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 app.get('/health', (async (_req: any, res: Response) => {
   const uptime = process.uptime();
@@ -67,6 +86,11 @@ app.get('/health', (async (_req: any, res: Response) => {
 // API routes
 app.use('/api/v1', notificationRoutes);
 app.use('/api/v1', metricsRoutes);
+
+// Swagger documentation
+app.use('/api/docs', swaggerUi.serve, swaggerUi.setup(swaggerSpec));
+
+logger.info('Swagger mounted at /api/docs');
 
 // Bull Board dashboard with Basic Auth
 const dashboardAuth = (req: Request, res: Response, next: () => void) => {
@@ -100,6 +124,22 @@ const dashboardAuth = (req: Request, res: Response, next: () => void) => {
 };
 
 app.use('/admin/queues', dashboardAuth as RequestHandler, getDashboardRouter());
+
+/**
+ * @swagger
+ * /admin/queues:
+ *   get:
+ *     summary: Bull Board dashboard
+ *     description: Interactive dashboard for monitoring BullMQ queues. Requires Basic Authentication.
+ *     tags: [Monitoring]
+ *     security:
+ *       - basicAuth: []
+ *     responses:
+ *       200:
+ *         description: Dashboard HTML page
+ *       401:
+ *         description: Authentication required or invalid credentials
+ */
 
 logger.info('Dashboard mounted at /admin/queues');
 
